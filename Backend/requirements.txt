@@ -6,3 +6,5 @@ faiss-cpu
 groq
 numpy
 python-dotenv==1.0.1
+gunicorn
+gevent

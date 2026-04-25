@@ -22,7 +22,14 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # CORS lets our React frontend (localhost:5173) talk to this Flask server
 # (localhost:5000). Without it, browsers block cross-origin requests.
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:3000"]}})
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "http://localhost:5173", 
+            "https://rag-chatbot-frontend.vercel.app"
+        ]
+    }
+})
 
 # Where to save the FAISS index between restarts
 INDEX_DIR = "./saved_index"
