@@ -28,7 +28,9 @@ export default function UploadPanel({ onUploaded }) {
     }
   }
 
-  function onInputChange(e) { handleFile(e.target.files[0]); }
+  function onInputChange(e) {
+    handleFile(e.target.files[0]);
+  }
   function onDrop(e) {
     e.preventDefault();
     setDragging(false);
@@ -43,13 +45,24 @@ export default function UploadPanel({ onUploaded }) {
       </div>
 
       <div
-        className={`${styles.dropzone} ${dragging ? styles.dragging : ""} ${status === "success" ? styles.done : ""}`}
+        className={`${styles.dropzone} ${dragging ? styles.dragging : ""} ${
+          status === "success" ? styles.done : ""
+        }`}
         onDrop={onDrop}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onClick={() => status !== "success" && inputRef.current?.click()}
       >
-        <input ref={inputRef} type="file" accept=".pdf" onChange={onInputChange} style={{ display: "none" }} />
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf"
+          onChange={onInputChange}
+          style={{ display: "none" }}
+        />
 
         {status === "idle" && (
           <div className={styles.dropContent}>
@@ -63,7 +76,9 @@ export default function UploadPanel({ onUploaded }) {
           <div className={styles.dropContent}>
             <div className={styles.spinner} />
             <p className={styles.dropTitle}>Indexing document…</p>
-            <p className={styles.dropSub}>Chunking → Embedding → Building vector index</p>
+            <p className={styles.dropSub}>
+              Chunking → Embedding → Building vector index
+            </p>
           </div>
         )}
 
@@ -84,7 +99,13 @@ export default function UploadPanel({ onUploaded }) {
             <div className={styles.errorIcon}>✕</div>
             <p className={styles.dropTitle}>Upload failed</p>
             <p className={styles.dropSub}>{errorMsg}</p>
-            <button className={styles.retryBtn} onClick={(e) => { e.stopPropagation(); setStatus("idle"); }}>
+            <button
+              className={styles.retryBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                setStatus("idle");
+              }}
+            >
               Try again
             </button>
           </div>
@@ -111,7 +132,13 @@ export default function UploadPanel({ onUploaded }) {
       )}
 
       {status === "success" && (
-        <button className={styles.changeBtn} onClick={() => { setStatus("idle"); setInfo(null); }}>
+        <button
+          className={styles.changeBtn}
+          onClick={() => {
+            setStatus("idle");
+            setInfo(null);
+          }}
+        >
           ↩ Upload different document
         </button>
       )}
