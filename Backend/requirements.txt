@@ -1,8 +1,7 @@
 flask==3.0.0
 flask-cors==4.0.0
 pypdf==3.17.4
-sentence-transformers==3.0.1
-transformers>=4.40.0
+requests
 faiss-cpu
 groq
 numpy

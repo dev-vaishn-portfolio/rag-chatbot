@@ -1,66 +1,75 @@
-from sentence_transformers import SentenceTransformer
+import os
+import time
+import requests
 import numpy as np
 
-# We load the model ONCE when this module is imported.
-# WHY: Loading an ML model takes ~2-3 seconds. If we loaded it
-# on every request, the app would be unbearably slow.
-# By loading at module level, it's loaded once when Flask starts.
-#
-# WHY this model (all-MiniLM-L6-v2)?
-# - Small (80MB) — fast to download and run
-# - Produces 384-dimensional vectors — good balance of quality vs speed
-# - Free, runs locally — no API cost for embeddings
-# - Specifically designed for semantic similarity tasks (exactly what we need)
-print("[Embedder] Loading embedding model...")
-model = SentenceTransformer("all-MiniLM-L6-v2")
-print("[Embedder] Model ready.")
+# We use the Hugging Face Inference API instead of a local model to save RAM!
+# This requires NO local model weights (saves ~1GB of RAM).
+# For best results in production, set HF_TOKEN in your .env file.
+HF_TOKEN = os.getenv("HF_TOKEN")
+API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+
+print("[Embedder] Initialized API Embedder using HuggingFace Inference API.")
+
+def get_hf_embeddings(texts: list[str], max_retries: int = 4) -> np.ndarray:
+    """Helper function to call HF API with retries for cold-start (503)."""
+    headers = {}
+    if HF_TOKEN:
+        headers["Authorization"] = f"Bearer {HF_TOKEN}"
+        
+    for attempt in range(max_retries):
+        response = requests.post(API_URL, headers=headers, json={"inputs": texts})
+        
+        if response.status_code == 200:
+            return np.array(response.json())
+        elif response.status_code == 503:
+            # The model is currently loading into HF's servers
+            print(f"[Embedder] HF Model is loading... Retrying in 10s (Attempt {attempt+1}/{max_retries})")
+            time.sleep(10)
+        else:
+            raise Exception(f"HuggingFace API Error ({response.status_code}): {response.text}")
+            
+    raise Exception("HuggingFace API failed: Model took too long to load.")
 
 
 def embed_text(text: str) -> np.ndarray:
     """
     Convert a single string into a vector (1D numpy array of 384 floats).
-    
-    We use this to embed the USER'S QUESTION at query time.
-    It must use the SAME model as the chunks — otherwise the vectors
-    live in different "spaces" and similarity search becomes meaningless.
-    Think of it like: you can't compare temperatures in Celsius vs Fahrenheit
-    without converting first.
     """
-    embedding = model.encode(text, convert_to_numpy=True)
-    # Normalize to unit length — makes cosine similarity = dot product
-    # which is what FAISS IndexFlatIP uses (faster than L2 for this use case)
+    embedding = get_hf_embeddings([text])[0]
+    # Normalize to unit length for cosine similarity
     embedding = embedding / np.linalg.norm(embedding)
     return embedding
 
 
 def embed_chunks(chunks: list[dict]) -> tuple[list[dict], np.ndarray]:
     """
-    Embed all text chunks and return:
-    1. The original chunks list (unchanged, for reference)
+    Embed all text chunks via API and return:
+    1. The original chunks list
     2. A 2D numpy array of shape (num_chunks, 384)
-       where each row is one chunk's embedding vector
-    
-    WHY batch encoding?
-    model.encode() with a list of texts processes them in batches
-    internally — much faster than calling encode() in a loop.
-    
-    show_progress_bar=True lets you see progress for large PDFs.
     """
     texts = [chunk["text"] for chunk in chunks]
+    print(f"[Embedder] Embedding {len(texts)} chunks via HF API...")
     
-    print(f"[Embedder] Embedding {len(texts)} chunks...")
-    embeddings = model.encode(
-        texts,
-        convert_to_numpy=True,
-        show_progress_bar=True,
-        batch_size=32  # Process 32 chunks at a time
-    )
+    # Process in batches to avoid payload size limits and timeouts
+    batch_size = 32
+    all_embeddings = []
     
-    # Normalize all vectors at once (faster than one by one)
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+        try:
+            batch_emb = get_hf_embeddings(batch_texts)
+            all_embeddings.extend(batch_emb)
+        except Exception as e:
+            print(f"[Embedder] Error during batch embedding: {e}")
+            raise e
+            
+    embeddings = np.array(all_embeddings)
+    
+    # Normalize all vectors at once
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / norms
     
     print(f"[Embedder] Done. Embedding shape: {embeddings.shape}")
-    # e.g. "Embedding shape: (24, 384)" → 24 chunks, each a 384-dim vector
     
     return chunks, embeddings
