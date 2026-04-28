@@ -26,7 +26,7 @@ CORS(app, resources={
     r"/api/*": {
         "origins": [
             "http://localhost:5173", 
-            "https://rag-chatbot-frontend.vercel.app"
+            "https://rag-chatbot-zeta-khaki.vercel.app"
         ]
     }
 })
